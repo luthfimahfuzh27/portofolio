@@ -1,0 +1,121 @@
+-- Pertanyaan 1 : Selama transaksi yang terjadi selama 2021, pada bulan apa total nilai transaksi(after_discount) paling besar? --
+
+SELECT 
+  EXTRACT (MONTH from order_date) Month,
+  SUM (after_discount) Transaction_Total
+FROM 
+  `final-project-422502.Sales_Data.order_detail`
+WHERE
+    EXTRACT (YEAR from order_date) = 2021
+    AND is_valid = 1
+GROUP BY
+    EXTRACT (MONTH from order_date)
+ORDER BY
+    SUM (after_discount) DESC;
+
+-- Pertanyaan 2 : Selama transaksi pada tahun 2022, kategori apa yang menghasilkan nilai transaksi paling besar? --
+
+SELECT
+  sd.category,
+  SUM (od.after_discount) Transaction_Total -- aggregate after discount column in every rows
+FROM 
+  `final-project-422502.Sales_Data.order_detail` od
+JOIN 
+  `final-project-422502.Sales_Data.sku_detail` sd
+  ON
+   od.sku_id = sd.id -- JOIN data from table order detail and SKU detail
+WHERE
+  EXTRACT (YEAR from order_date) = 2022 -- filter only for transaction in year 2022
+  and is_valid = 1
+GROUP BY
+  1 -- Grouping for category
+ORDER BY
+  2 DESC -- Sorting Descendants for Transaction Total
+LIMIT
+ 1 ;-- Displaying for the highest Transaction Total
+
+-- Pertanyaan 3 : Bandingkan nilai transaksi dari masing-masing kategori pada tahun 2021 dengan 2022.Sebutkan kategori apa saja yang mengalami peningkatan dan kategori apa yang mengalami penurunan nilai transaksi dari tahun 2021 ke 2022
+
+SELECT
+  category Category,
+  Transaction_Total_2021,
+  Transaction_Total_2022,
+  CASE
+    WHEN Transaction_Total_2021 < Transaction_Total_2022 THEN 'Increase'
+    WHEN Transaction_Total_2021 > Transaction_Total_2022 THEN 'Decrease'
+  END
+    as Trend_Status, -- for create trend status increase or decrease
+  ROUND (((Transaction_Total_2022 - Transaction_Total_2021)/ Transaction_Total_2021) * 100, 2) as Percent_Gap
+FROM (
+  SELECT
+    sd.category,
+    round (SUM(CASE 
+      WHEN EXTRACT (YEAR from od.order_date) = 2021 THEN od.after_discount
+      ELSE 0
+      END ), 2) Transaction_Total_2021, -- Aggregate for SUM transaction in 2021
+    round (SUM(CASE 
+      WHEN EXTRACT (YEAR from od.order_date) = 2022 THEN od.after_discount
+      ELSE 0
+      END ), 2) Transaction_Total_2022  -- Aggregate for SUM transaction in 2022
+  FROM `final-project-422502.Sales_Data.order_detail` od
+  JOIN 
+  `final-project-422502.Sales_Data.sku_detail` sd
+  ON 
+  od.sku_id = sd.id
+  WHERE 
+  od.is_valid = 1
+  GROUP BY
+  sd.category ) yearly_totals -- subquery for transaction total 2021 & 2022 with using JOIN from sku & order detail id
+WHERE
+ Transaction_Total_2021 != Transaction_Total_2022; -- filter only for Transaction Total 2021
+
+
+-- Pertanyaan 4 : Tampilkan top 5 metode pembayaran yang paling populer digunakan selama 2022, berdasarkan total unique order
+
+SELECT
+  pd.payment_method Payment_Method,
+  count (DISTINCT od.id) Total_Unique_Orders -- Count total Unique Order
+FROM
+ `Sales_Data.order_detail` od
+JOIN
+`Sales_Data.payment_detail` pd -- JOIN table order detail & payment detail based on payment id
+ON
+ od.payment_id = pd.id
+WHERE
+EXTRACT (YEAR FROM od.order_date) = 2022 -- Filter for only transaction in year 2022
+AND is_valid = 1
+GROUP BY 1 -- grouping payment method
+ORDER BY 2 DESC -- sorting total unique orders in descending
+LIMIT 5 ;-- displaying top 5 payment method in 2022
+
+-- Pertanyaan 5 : Urutkan dari ke-5 produk ini berdasarkan nilai transaksinya 1.Samsung, 2.Apple, 3.Sony, 4.Huawei, 5.Lenovo
+
+SELECT
+   CASE 
+    WHEN LOWER (sd.sku_name) LIKE '%samsung%' THEN 'Samsung'
+    WHEN LOWER (sd.sku_name) LIKE '%iphone%' OR LOWER (sd.sku_name) LIKE '%macbook%' OR LOWER (sd.sku_name) LIKE '%apple%' THEN 'Apple'
+    WHEN LOWER (sd.sku_name) LIKE '%sony%' THEN 'Sony'
+    WHEN LOWER (sd.sku_name) LIKE '%huawei%' THEN 'Huawei'
+    WHEN LOWER (sd.sku_name) LIKE '%lenovo%' THEN 'Lenovo'
+   END as Brand,-- searching specific sku name with CASE WHEN Function, LOWER casing and LIKE THEN Function for create same format
+  SUM (od.after_discount) Total_Transaction -- Transaction Total after discount
+FROM
+  `Sales_Data.order_detail` od
+JOIN
+  `Sales_Data.sku_detail`sd -- JOIN Function for combine SKU detail and order detail based on sku id
+ON
+od.sku_id = sd.id
+WHERE
+  EXTRACT (YEAR from order_date) = 2022 -- filter for only Transaction in year 2022 only
+  AND is_valid = 1
+  AND
+  (LOWER (sd.sku_name) LIKE '%samsung%'
+  OR LOWER (sd.sku_name) LIKE '%iphone%'
+  OR LOWER (sd.sku_name) LIKE '%macbook%'
+  OR LOWER (sd.sku_name) LIKE '%apple%'
+  OR LOWER (sd.sku_name) LIKE '%sony%'
+  OR LOWER (sd.sku_name) LIKE '%huawei%'
+  OR LOWER (sd.sku_name) LIKE '%lenovo%'
+  ) --filter for any value match with sku name with CASE WHEN Function, LOWER casing and LIKE Function
+  GROUP BY 1 -- group by Brand 
+  ORDER BY 2 DESC; -- sort by Total Transaction
